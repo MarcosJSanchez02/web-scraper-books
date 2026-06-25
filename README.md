@@ -1,10 +1,10 @@
-# Books Web Scraper
+# 📚 Books Web Scraper
 
-Python web scraper that extracts 1000 books from [books.toscrape.com](https://books.toscrape.com) and exports the data to a formatted Excel file.
+Python web scraper that extracts 100 books from [books.toscrape.com](https://books.toscrape.com) and exports the data to a formatted Excel file.
 
 ## Features
-- Scrapes 50 pages automatically
-- Extracts title, price and star rating for each book
+- Scrapes multiple pages automatically
+- Extracts title, price, star rating and category for each book
 - Exports data to Excel with styled headers and auto-adjusted columns
 
 ## Tech Stack
@@ -14,17 +14,13 @@ Python web scraper that extracts 1000 books from [books.toscrape.com](https://bo
 - openpyxl
 
 ## Installation
-```bash
 pip install requests beautifulsoup4 openpyxl
-```
 
 ## Usage
-```bash
 python scraper.py
-```
 
 ## Output
-| Title | Price | Rating |
-|-------|-------|--------|
-| A Light in the Attic | £51.77 | ★★★☆☆ |
-| Tipping the Velvet | £53.74 | ★☆☆☆☆ |
+| Title | Price | Rating | Category |
+|-------|-------|--------|----------|
+| A Light in the Attic | £51.77 | ★★★☆☆ | Poetry |
+| Tipping the Velvet | £53.74 | ★☆☆☆☆ | Historical Fiction |
