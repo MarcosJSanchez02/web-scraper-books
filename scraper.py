@@ -13,6 +13,14 @@ RATINGS = {
     "Five": "★★★★★"
 }
 
+RATINGS_VALUE = {
+    "One": 1,
+    "Two": 2,
+    "Three": 3,
+    "Four": 4,
+    "Five": 5
+}
+
 def get_category(book_url):
     response = requests.get(book_url)
     response.encoding = "utf-8"
@@ -22,11 +30,21 @@ def get_category(book_url):
         return breadcrumb.find_all("li")[2].text.strip()
     return "Unknown"
 
+# Ask user for minimum rating
+while True:
+    try:
+        min_rating = int(input("⭐ Minimum rating filter (1-5): "))
+        if 1 <= min_rating <= 5:
+            break
+        print("Please enter a number between 1 and 5.")
+    except ValueError:
+        print("Please enter a valid number.")
+
 books = []
 
 print("⏳ Scraping pages...")
 
-for page_number in range(1, 6):  # 5 pages = 100 books
+for page_number in range(1, 6):
 
     url = BASE_URL if page_number == 1 else f"{BASE_URL}catalogue/page-{page_number}.html"
 
@@ -37,9 +55,14 @@ for page_number in range(1, 6):  # 5 pages = 100 books
     for book in soup.find_all("article", class_="product_pod"):
         title = book.find("h3").find("a")["title"]
         price = book.find("p", class_="price_color").text
-        rating = RATINGS[book.find("p", class_="star-rating")["class"][1]]
+        rating_word = book.find("p", class_="star-rating")["class"][1]
+        rating = RATINGS[rating_word]
+        rating_value = RATINGS_VALUE[rating_word]
 
-        # Build full URL for each book
+        # Skip books below minimum rating
+        if rating_value < min_rating:
+            continue
+
         book_path = book.find("h3").find("a")["href"].replace("../", "")
         if not book_path.startswith("catalogue/"):
             book_path = f"catalogue/{book_path}"
@@ -47,7 +70,7 @@ for page_number in range(1, 6):  # 5 pages = 100 books
         category = get_category(book_url)
 
         books.append([title, price, rating, category])
-        print(f"  📖 {title[:50]} — {category}")
+        print(f"  📖 {title[:50]} — {rating} — {category}")
 
     print(f"✅ Page {page_number}/5 done\n")
 
@@ -74,4 +97,4 @@ for col in ws.columns:
 
 wb.save("books.xlsx")
 
-print(f"\n🏆 Done! {len(books)} books saved to books.xlsx")
+print(f"\n🏆 Done! {len(books)} books with {min_rating}+ stars saved to books.xlsx")
