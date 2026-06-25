@@ -30,21 +30,44 @@ def get_category(book_url):
         return breadcrumb.find_all("li")[2].text.strip()
     return "Unknown"
 
-# Ask user for minimum rating
-while True:
-    try:
-        min_rating = int(input("⭐ Minimum rating filter (1-5): "))
-        if 1 <= min_rating <= 5:
-            break
-        print("Please enter a number between 1 and 5.")
-    except ValueError:
-        print("Please enter a valid number.")
+def get_menu():
+    print("=" * 40)
+    print("        📚 BOOKS WEB SCRAPER")
+    print("=" * 40)
+
+    # Number of pages
+    while True:
+        try:
+            pages = int(input("📄 How many pages do you want to scrape? (1-50): "))
+            if 1 <= pages <= 50:
+                break
+            print("Please enter a number between 1 and 50.")
+        except ValueError:
+            print("Please enter a valid number.")
+
+    # Minimum rating
+    while True:
+        try:
+            min_rating = int(input("⭐ Minimum rating filter (1-5): "))
+            if 1 <= min_rating <= 5:
+                break
+            print("Please enter a number between 1 and 5.")
+        except ValueError:
+            print("Please enter a valid number.")
+
+    # Category filter
+    category_filter = input("📂 Filter by category? (leave empty for all): ").strip().lower()
+
+    return pages, min_rating, category_filter
+
+# Show menu and get user choices
+pages, min_rating, category_filter = get_menu()
 
 books = []
 
-print("⏳ Scraping pages...")
+print("\n⏳ Scraping pages...")
 
-for page_number in range(1, 6):
+for page_number in range(1, pages + 1):
 
     url = BASE_URL if page_number == 1 else f"{BASE_URL}catalogue/page-{page_number}.html"
 
@@ -69,10 +92,14 @@ for page_number in range(1, 6):
         book_url = f"{BASE_URL}{book_path}"
         category = get_category(book_url)
 
+        # Skip books that don't match category filter
+        if category_filter and category_filter not in category.lower():
+            continue
+
         books.append([title, price, rating, category])
         print(f"  📖 {title[:50]} — {rating} — {category}")
 
-    print(f"✅ Page {page_number}/5 done\n")
+    print(f"✅ Page {page_number}/{pages} done\n")
 
 # Create and style the Excel file
 wb = Workbook()
@@ -91,10 +118,11 @@ for col, header in enumerate(["Title", "Price", "Rating", "Category"], start=1):
 for book in books:
     ws.append(book)
 
-for col in ws.columns:
-    max_width = max(len(str(cell.value)) for cell in col if cell.value)
-    ws.column_dimensions[col[0].column_letter].width = max_width + 4
-
-wb.save("books.xlsx")
-
-print(f"\n🏆 Done! {len(books)} books with {min_rating}+ stars saved to books.xlsx")
+if books:
+    for col in ws.columns:
+        max_width = max(len(str(cell.value)) for cell in col if cell.value)
+        ws.column_dimensions[col[0].column_letter].width = max_width + 4
+    wb.save("books.xlsx")
+    print(f"\n🏆 Done! {len(books)} books saved to books.xlsx")
+else:
+    print("\n⚠️ No books found with those filters. Try different options.")
