@@ -1,9 +1,11 @@
 import requests
+import os
 from bs4 import BeautifulSoup
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment
 
 BASE_URL = "https://books.toscrape.com/"
+OUTPUT_FILE = "books.xlsx"
 
 RATINGS = {
     "One": "★☆☆☆☆",
@@ -30,12 +32,23 @@ def get_category(book_url):
         return breadcrumb.find_all("li")[2].text.strip()
     return "Unknown"
 
+def get_existing_titles():
+    """Load titles already saved in the Excel file to avoid duplicates."""
+    if not os.path.exists(OUTPUT_FILE):
+        return set()
+    wb = load_workbook(OUTPUT_FILE)
+    ws = wb.active
+    titles = set()
+    for row in ws.iter_rows(min_row=2, values_only=True):
+        if row[0]:
+            titles.add(row[0])
+    return titles
+
 def get_menu():
     print("=" * 40)
     print("        📚 BOOKS WEB SCRAPER")
     print("=" * 40)
 
-    # Number of pages
     while True:
         try:
             pages = int(input("📄 How many pages do you want to scrape? (1-50): "))
@@ -45,7 +58,6 @@ def get_menu():
         except ValueError:
             print("Please enter a valid number.")
 
-    # Minimum rating
     while True:
         try:
             min_rating = int(input("⭐ Minimum rating filter (1-5): "))
@@ -55,13 +67,51 @@ def get_menu():
         except ValueError:
             print("Please enter a valid number.")
 
-    # Category filter
     category_filter = input("📂 Filter by category? (leave empty for all): ").strip().lower()
 
     return pages, min_rating, category_filter
 
-# Show menu and get user choices
+def build_book_url(book):
+    book_path = book.find("h3").find("a")["href"].replace("../", "")
+    if not book_path.startswith("catalogue/"):
+        book_path = f"catalogue/{book_path}"
+    return f"{BASE_URL}{book_path}"
+
+def save_to_excel(books, existing_count):
+    # If file exists, append to it. Otherwise create a new one.
+    if os.path.exists(OUTPUT_FILE) and existing_count > 0:
+        wb = load_workbook(OUTPUT_FILE)
+        ws = wb.active
+    else:
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Books"
+
+        header_fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+
+        for col, header in enumerate(["Title", "Price", "Rating", "Category"], start=1):
+            cell = ws.cell(row=1, column=col, value=header)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center")
+
+    for book in books:
+        ws.append(book)
+
+    for col in ws.columns:
+        max_width = max(len(str(cell.value)) for cell in col if cell.value)
+        ws.column_dimensions[col[0].column_letter].width = max_width + 4
+
+    wb.save(OUTPUT_FILE)
+
+# --- MAIN ---
 pages, min_rating, category_filter = get_menu()
+
+# Load existing titles to skip duplicates
+existing_titles = get_existing_titles()
+if existing_titles:
+    print(f"\n⚠️  Found {len(existing_titles)} books already saved. Skipping duplicates.")
 
 books = []
 
@@ -82,17 +132,16 @@ for page_number in range(1, pages + 1):
         rating = RATINGS[rating_word]
         rating_value = RATINGS_VALUE[rating_word]
 
-        # Skip books below minimum rating
         if rating_value < min_rating:
             continue
 
-        book_path = book.find("h3").find("a")["href"].replace("../", "")
-        if not book_path.startswith("catalogue/"):
-            book_path = f"catalogue/{book_path}"
-        book_url = f"{BASE_URL}{book_path}"
+        if title in existing_titles:
+            print(f"  ⏭️  Skipping duplicate: {title[:50]}")
+            continue
+
+        book_url = build_book_url(book)
         category = get_category(book_url)
 
-        # Skip books that don't match category filter
         if category_filter and category_filter not in category.lower():
             continue
 
@@ -101,28 +150,10 @@ for page_number in range(1, pages + 1):
 
     print(f"✅ Page {page_number}/{pages} done\n")
 
-# Create and style the Excel file
-wb = Workbook()
-ws = wb.active
-ws.title = "Books"
-
-header_fill = PatternFill(start_color="2E75B6", end_color="2E75B6", fill_type="solid")
-header_font = Font(bold=True, color="FFFFFF", size=12)
-
-for col, header in enumerate(["Title", "Price", "Rating", "Category"], start=1):
-    cell = ws.cell(row=1, column=col, value=header)
-    cell.fill = header_fill
-    cell.font = header_font
-    cell.alignment = Alignment(horizontal="center")
-
-for book in books:
-    ws.append(book)
-
 if books:
-    for col in ws.columns:
-        max_width = max(len(str(cell.value)) for cell in col if cell.value)
-        ws.column_dimensions[col[0].column_letter].width = max_width + 4
-    wb.save("books.xlsx")
-    print(f"\n🏆 Done! {len(books)} books saved to books.xlsx")
+    save_to_excel(books, len(existing_titles))
+    print(f"\n🏆 Done! {len(books)} new books saved to {OUTPUT_FILE}")
+elif existing_titles:
+    print("\n✅ No new books found, everything was already saved.")
 else:
-    print("\n⚠️ No books found with those filters. Try different options.")
+    print("\n⚠️  No books found with those filters. Try different options.")
